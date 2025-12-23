@@ -1,0 +1,73 @@
+version: '3.8'
+
+# FeatherFlow 生产环境配置
+# 仅包含应用容器，数据库连接信息通过环境变量配置
+
+services:
+  app:
+    # 构建应用镜像
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: featherflow-app
+    restart: unless-stopped
+
+    # 环境变量配置
+    environment:
+      # 数据库配置（必须配置）
+      MYSQL_HOST: ${MYSQL_HOST:-localhost}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_USER: ${MYSQL_USER:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-tiangenexora}
+
+      # 业务配置
+      KEYWORDS: ${KEYWORDS:-鹅,玉米,豆粕}
+      CRON: ${CRON:-30 8 * * *}
+      RUN_ON_START: ${RUN_ON_START:-1}
+
+      # HTTP/爬虫配置
+      HTTP_TIMEOUT_SECONDS: ${HTTP_TIMEOUT_SECONDS:-20}
+      HTTP_RETRY_TIMES: ${HTTP_RETRY_TIMES:-2}
+      ENABLE_PLAYWRIGHT_FALLBACK: ${ENABLE_PLAYWRIGHT_FALLBACK:-1}
+      PLAYWRIGHT_HEADLESS: ${PLAYWRIGHT_HEADLESS:-1}
+
+      # 反爬虫配置
+      BACKOFF_BASE_SECONDS: ${BACKOFF_BASE_SECONDS:-10}
+      BACKOFF_MAX_SECONDS: ${BACKOFF_MAX_SECONDS:-600}
+      BLOCKED_MAX_RETRY: ${BLOCKED_MAX_RETRY:-2}
+
+      # 日志和其他配置
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      TZ: ${TZ:-Asia/Shanghai}
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+
+    # 挂载日志目录
+    volumes:
+      - ../logs:/app/logs
+
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"

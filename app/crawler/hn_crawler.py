@@ -18,7 +18,7 @@ from app.config import Settings
 from app.crawler.block_detector import detect_blocked
 from app.crawler.http_fetcher import fetch_html
 from app.crawler.playwright_fetcher import PlaywrightFetcher
-from app.db.mysql import MySqlPool, PriceRow, exists_today, upsert_rows
+from app.db.mysql import MySqlPool, PriceRow, get_last_page, save_page_progress, upsert_rows
 from app.parser.hn_parser import extract_total_pages, parse_market_list
 
 logger = logging.getLogger(__name__)
@@ -202,20 +202,14 @@ class HnCrawler:
 
     def crawl_keyword(self, keyword: str) -> KeywordCrawlStats:
         """
-        抓取某个关键词的全部分页，并入库。
+        抓取某个关键词的全部分页，并入库（支持断点续爬）。
         """
         today = date.today()
-        if exists_today(self._db, keyword=keyword, day=today):
-            logger.info("关键词已存在当天数据，跳过：keyword=%s day=%s", keyword, today.isoformat())
-            return KeywordCrawlStats(
-                keyword=keyword,
-                pages_total=0,
-                pages_fetched=0,
-                rows_parsed=0,
-                rows_upserted=0,
-                blocked=False,
-                blocked_reason=None,
-            )
+
+        # 获取上次爬取进度（断点续爬）
+        last_page = get_last_page(self._db, keyword, today)
+        if last_page > 0:
+            logger.info("断点续爬：keyword=%s day=%s 从第%s页继续", keyword, today.isoformat(), last_page + 1)
 
         first_url = _build_search_url(keyword)
 
@@ -267,6 +261,11 @@ class HnCrawler:
         rows_upserted = 0
 
         for page_idx, page_url in enumerate(page_urls, start=1):
+            # 断点续爬：跳过已完成的页面
+            if page_idx <= last_page:
+                logger.debug("跳过已爬取页面：keyword=%s page=%s", keyword, page_idx)
+                continue
+
             html = first_html if page_idx == 1 else None
             if html is None:
                 html, status, reason = self._fetch_page_html(page_url)
@@ -284,6 +283,9 @@ class HnCrawler:
                         sec,
                     )
                     time.sleep(sec)
+                    # 保存当前进度（断点续爬）
+                    if page_idx > 1:
+                        save_page_progress(self._db, keyword, today, page_idx - 1)
                     return KeywordCrawlStats(
                         keyword=keyword,
                         pages_total=total_pages,
@@ -320,6 +322,10 @@ class HnCrawler:
             ]
             affected = upsert_rows(self._db, to_save)
             rows_upserted += len(to_save)
+
+            # 保存爬取进度（支持断点续爬）
+            save_page_progress(self._db, keyword, today, page_idx)
+
             logger.info(
                 "分页入库完成：keyword=%s page=%s/%s parsed=%s upserted=%s affected=%s",
                 keyword,

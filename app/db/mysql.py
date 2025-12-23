@@ -182,3 +182,38 @@ def upsert_rows(pool: MySqlPool, rows: Sequence[PriceRow]) -> int:
             return int(affected or 0)
 
 
+def get_last_page(pool: MySqlPool, keyword: str, crawl_date: date) -> int:
+    """
+    获取某关键词在指定日期爬取到的最大页码（用于断点续爬）。
+
+    返回：
+        - 0：当天未开始爬取
+        - >0：上次爬取到的页码
+    """
+    sql = (
+        "SELECT last_page FROM hn_daily_record "
+        "WHERE keyword = %s AND process_date = %s"
+    )
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (keyword, crawl_date))
+            row = cur.fetchone()
+            return int(row["last_page"]) if row else 0
+
+
+def save_page_progress(pool: MySqlPool, keyword: str, crawl_date: date, page: int) -> None:
+    """
+    保存爬取进度（用于断点续爬）。
+
+    如果记录不存在则插入，存在则更新 last_page。
+    """
+    sql = (
+        "INSERT INTO hn_daily_record (keyword, process_date, last_page) "
+        "VALUES (%s, %s, %s) "
+        "ON DUPLICATE KEY UPDATE last_page = %s, updated_at = CURRENT_TIMESTAMP"
+    )
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (keyword, crawl_date, page, page))
+
+
