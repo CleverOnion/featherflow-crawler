@@ -200,16 +200,23 @@ class HnCrawler:
             return pw_res.text, pw_res.status_code, f"playwright_blocked:{decision2.reason}"
         return pw_res.text, pw_res.status_code, "playwright_ok"
 
-    def crawl_keyword(self, keyword: str) -> KeywordCrawlStats:
+    def crawl_keyword(self, keyword: str, force_restart: bool = False) -> KeywordCrawlStats:
         """
         抓取某个关键词的全部分页，并入库（支持断点续爬）。
+
+        Args:
+            keyword: 要爬取的关键词
+            force_restart: 是否强制重新开始（忽略断点续爬）
         """
         today = date.today()
 
         # 获取上次爬取进度（断点续爬）
-        last_page = get_last_page(self._db, keyword, today)
-        if last_page > 0:
+        # force_restart=True 时，从头开始爬取
+        last_page = 0 if force_restart else get_last_page(self._db, keyword, today)
+        if last_page > 0 and not force_restart:
             logger.info("断点续爬：keyword=%s day=%s 从第%s页继续", keyword, today.isoformat(), last_page + 1)
+        elif force_restart:
+            logger.info("强制重新爬取：keyword=%s day=%s 从第1页开始", keyword, today.isoformat())
 
         first_url = _build_search_url(keyword)
 

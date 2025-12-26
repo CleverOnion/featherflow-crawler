@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FeatherFlow - 惠农网行情爬虫管理</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>FeatherFlow 爬虫管理</h1>
+            <p class="subtitle">惠农网行情定时爬虫系统</p>
+        </header>
+
+        <!-- 任务表单 -->
+        <section class="task-form">
+            <h2>手动执行爬虫</h2>
+            <form id="crawlForm">
+                <label for="keywords">关键词（逗号分隔）：</label>
+                <div class="input-group">
+                    <input
+                        type="text"
+                        id="keywords"
+                        name="keywords"
+                        placeholder="例如：鹅,玉米,豆粕"
+                        required
+                        autocomplete="off"
+                    >
+                    <button type="submit" id="submitBtn">
+                        <span class="btn-text">开始爬取</span>
+                    </button>
+                </div>
+                <div class="quick-keywords">
+                    <span class="quick-label">快捷选择：</span>
+                    <button type="button" class="quick-btn" data-keywords="鹅">鹅</button>
+                    <button type="button" class="quick-btn" data-keywords="玉米">玉米</button>
+                    <button type="button" class="quick-btn" data-keywords="豆粕">豆粕</button>
+                    <button type="button" class="quick-btn" data-keywords="小麦,大豆">小麦,大豆</button>
+                </div>
+                <div class="crawl-mode">
+                    <span class="mode-label">爬取模式：</span>
+                    <label class="radio-option">
+                        <input type="radio" name="crawlMode" value="continue" checked>
+                        <span>续爬（从上次中断处继续）</span>
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="crawlMode" value="restart">
+                        <span>重新爬取（从头开始）</span>
+                    </label>
+                </div>
+            </form>
+        </section>
+
+        <!-- 任务状态 -->
+        <section class="task-status" id="taskStatus" style="display: none;">
+            <h2>执行状态</h2>
+            <div class="status-info">
+                <span class="status-badge" id="statusBadge">准备中</span>
+                <span class="task-id" id="taskId">任务ID: -</span>
+            </div>
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">0/0</div>
+            </div>
+            <div class="current-keyword" id="currentKeyword"></div>
+        </section>
+
+        <!-- 执行日志 -->
+        <section class="task-logs">
+            <div class="section-header">
+                <h2>执行日志</h2>
+                <button class="clear-btn" id="clearLogsBtn" title="清空日志">清空</button>
+            </div>
+            <div class="log-container" id="logContainer">
+                <div class="log-entry log-info">等待任务启动...</div>
+            </div>
+        </section>
+
+        <!-- 最近任务 -->
+        <section class="recent-tasks">
+            <h2>最近任务</h2>
+            <div class="table-container">
+                <table id="tasksTable">
+                    <thead>
+                        <tr>
+                            <th>任务ID</th>
+                            <th>关键词</th>
+                            <th>状态</th>
+                            <th>进度</th>
+                            <th>创建时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="empty-row">
+                            <td colspan="5">暂无任务记录</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 页脚 -->
+        <footer>
+            <p>FeatherFlow v1.0 | 惠农网行情爬虫系统</p>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

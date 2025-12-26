@@ -1,5 +1,3 @@
-version: '3.8'
-
 # FeatherFlow 生产环境配置
 # 仅包含应用容器，数据库连接信息通过环境变量配置
 
@@ -43,9 +41,19 @@ services:
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONUNBUFFERED: "1"
 
+      # Flask Web 服务配置
+      FLASK_ENABLED: ${FLASK_ENABLED:-1}
+      FLASK_HOST: ${FLASK_HOST:-0.0.0.0}
+      FLASK_PORT: ${FLASK_PORT:-5000}
+      FLASK_DEBUG: ${FLASK_DEBUG:-0}
+
     # 挂载日志目录
     volumes:
       - ../logs:/app/logs
+
+    # Flask Web 服务端口映射
+    ports:
+      - "${FLASK_PORT:-5000}:5000"
 
     # 健康检查
     healthcheck:

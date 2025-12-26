@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     # ---------- 日志 ----------
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
+    # ---------- Flask Web Server ----------
+    flask_enabled: int = Field(default=1, alias="FLASK_ENABLED")
+    flask_host: str = Field(default="0.0.0.0", alias="FLASK_HOST")
+    flask_port: int = Field(default=5000, alias="FLASK_PORT")
+    flask_debug: int = Field(default=0, alias="FLASK_DEBUG")
+
     def keyword_list(self) -> List[str]:
         """把 KEYWORDS 拆成列表，并做去重/去空。"""
         items = [x.strip() for x in (self.keywords or "").split(",")]

@@ -15,12 +15,16 @@ import time
 from app.config import settings
 from app.crawler.hn_crawler import HnCrawler
 from app.db.mysql import MySqlPool, init_schema
+from app.db.task_repository import init_task_schema
 from app.logging_config import setup_logging
 from app.scheduler import start_scheduler
+from app.web.app import create_flask_app, run_flask_in_thread
+from app.web.task_manager import TaskManager
 
 logger = logging.getLogger(__name__)
 
 _db_pool: MySqlPool | None = None
+_task_manager: TaskManager | None = None
 
 
 def _get_db_pool() -> MySqlPool:
@@ -36,6 +40,14 @@ def _get_db_pool() -> MySqlPool:
             pool_size=settings.mysql_pool_size,
         )
     return _db_pool
+
+
+def _get_task_manager() -> TaskManager:
+    """获取或创建任务管理器。"""
+    global _task_manager
+    if _task_manager is None:
+        _task_manager = TaskManager()
+    return _task_manager
 
 
 def job_entry() -> None:
@@ -85,8 +97,32 @@ def main() -> None:
     # 尝试初始化 MySQL 表结构（失败不阻塞常驻，但会记录错误；后续任务执行时会再尝试）
     try:
         init_schema(_get_db_pool())
+        init_task_schema(_get_db_pool())
     except Exception:
         logger.exception("MySQL 初始化失败：请检查 MYSQL_* 配置与权限（服务仍会常驻）")
+
+    # 启动 Flask Web 服务（如果启用）
+    if settings.flask_enabled:
+        try:
+            flask_app = create_flask_app(
+                settings=settings,
+                db_pool=_get_db_pool(),
+                task_manager=_get_task_manager(),
+            )
+            flask_thread = threading.Thread(
+                target=run_flask_in_thread,
+                args=(
+                    flask_app,
+                    settings.flask_host,
+                    settings.flask_port,
+                    bool(settings.flask_debug),
+                ),
+                daemon=True,
+            )
+            flask_thread.start()
+            logger.info("Flask Web 服务已启动：http://%s:%s", settings.flask_host, settings.flask_port)
+        except Exception:
+            logger.exception("Flask Web 服务启动失败（服务仍会常驻）")
 
     stop_event = threading.Event()
 

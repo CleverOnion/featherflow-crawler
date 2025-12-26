@@ -12,7 +12,13 @@
       "Bash(git remote set-url:*)",
       "Bash(mkdir:*)",
       "Bash(chmod:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(dir:*)",
+      "Bash(more:*)",
+      "Bash(git fetch:*)",
+      "Bash(cp:*)",
+      "Bash(rm:*)",
+      "Bash(mv:*)"
     ],
     "deny": [],
     "ask": []
