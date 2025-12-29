@@ -217,3 +217,66 @@ def save_page_progress(pool: MySqlPool, keyword: str, crawl_date: date, page: in
             cur.execute(sql, (keyword, crawl_date, page, page))
 
 
+def get_missing_keywords(pool: MySqlPool, keywords: List[str], day: date) -> List[str]:
+    """
+    检查哪些关键词在指定日期缺少数据。
+
+    返回：没有数据的关键词列表。
+    """
+    if not keywords:
+        return []
+
+    placeholders = ",".join(["%s"] * len(keywords))
+    sql = (
+        f"SELECT DISTINCT keyword FROM hn_market_price "
+        f"WHERE keyword IN ({placeholders}) AND price_date = %s"
+    )
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, keywords + [day])
+            existing = {row["keyword"] for row in cur.fetchall()}
+
+    missing = [kw for kw in keywords if kw not in existing]
+    return missing
+
+
+def has_recent_data(pool: MySqlPool, keyword: str, day: date, tolerance_days: int = 1) -> bool:
+    """
+    检查关键词在指定日期前后是否有数据（允许一定的容错天数）。
+
+    用于检查某个关键词是否在合理的时间范围内有数据。
+    """
+    sql = (
+        "SELECT 1 FROM hn_market_price "
+        "WHERE keyword = %s "
+        "AND price_date BETWEEN DATE_SUB(%s, INTERVAL %s DAY) AND DATE_ADD(%s, INTERVAL %s DAY) "
+        "LIMIT 1"
+    )
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (keyword, day, tolerance_days, day, tolerance_days))
+            row = cur.fetchone()
+            return row is not None
+
+
+def get_keywords_data_count(pool: MySqlPool, keywords: List[str], day: date) -> Dict[str, int]:
+    """
+    获取每个关键词在指定日期的数据条数。
+
+    返回：{keyword: count} 字典。
+    """
+    if not keywords:
+        return {}
+
+    placeholders = ",".join(["%s"] * len(keywords))
+    sql = (
+        f"SELECT keyword, COUNT(*) as cnt FROM hn_market_price "
+        f"WHERE keyword IN ({placeholders}) AND price_date = %s "
+        f"GROUP BY keyword"
+    )
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, keywords + [day])
+            return {row["keyword"]: row["cnt"] for row in cur.fetchall()}
+
+

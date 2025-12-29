@@ -16,8 +16,9 @@ from app.config import settings
 from app.crawler.hn_crawler import HnCrawler
 from app.db.mysql import MySqlPool, init_schema
 from app.db.task_repository import init_task_schema
+from app.integrity_checker import IntegrityChecker
 from app.logging_config import setup_logging
-from app.scheduler import start_scheduler
+from app.scheduler import JobConfig, start_scheduler
 from app.web.app import create_flask_app, run_flask_in_thread
 from app.web.task_manager import TaskManager
 
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 _db_pool: MySqlPool | None = None
 _task_manager: TaskManager | None = None
+_integrity_checker: IntegrityChecker | None = None
 
 
 def _get_db_pool() -> MySqlPool:
@@ -48,6 +50,14 @@ def _get_task_manager() -> TaskManager:
     if _task_manager is None:
         _task_manager = TaskManager()
     return _task_manager
+
+
+def _get_integrity_checker() -> IntegrityChecker:
+    """获取或创建完整性检查器。"""
+    global _integrity_checker
+    if _integrity_checker is None:
+        _integrity_checker = IntegrityChecker(settings=settings, db_pool=_get_db_pool())
+    return _integrity_checker
 
 
 def job_entry() -> None:
@@ -82,6 +92,30 @@ def job_entry() -> None:
         logger.info("任务结束")
     finally:
         crawler.close()
+
+
+def integrity_check_entry() -> None:
+    """
+    数据完整性检查任务入口：检测缺失的关键词并自动补爬。
+    """
+    if not bool(settings.integrity_check_enabled):
+        logger.debug("数据完整性检查未启用（INTEGRITY_CHECK_ENABLED=0），跳过")
+        return
+
+    checker = _get_integrity_checker()
+    try:
+        result = checker.check_and_retry()
+        if result.missing_keywords:
+            logger.info(
+                "完整性检查完成：发现缺失 %s 个关键词，补爬成功 %s 个，失败 %s 个",
+                len(result.missing_keywords),
+                result.success_count,
+                result.failed_count,
+            )
+        else:
+            logger.debug("完整性检查完成：所有关键词数据完整")
+    except Exception:
+        logger.exception("完整性检查任务异常")
 
 
 def _wait_forever(stop_event: threading.Event) -> None:
@@ -135,10 +169,22 @@ def main() -> None:
     signal.signal(signal.SIGINT, _handle_signal)
 
     # 启动 scheduler
+    # 准备完整性检查任务配置（如果启用）
+    integrity_job = None
+    if bool(settings.integrity_check_enabled):
+        integrity_job = JobConfig(
+            cron_expr=settings.integrity_check_cron,
+            job_func=integrity_check_entry,
+            job_id="integrity_check_job",
+            job_name="数据完整性检查任务",
+        )
+        logger.info("数据完整性检查已启用，cron=%s", settings.integrity_check_cron)
+
     handle = start_scheduler(
         cron_expr=settings.cron,
         job_func=job_entry,
         run_on_start=bool(settings.run_on_start),
+        integrity_check_job=integrity_job,
     )
 
     try:

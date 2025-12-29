@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     flask_port: int = Field(default=5000, alias="FLASK_PORT")
     flask_debug: int = Field(default=0, alias="FLASK_DEBUG")
 
+    # ---------- 数据完整性检查 ----------
+    integrity_check_enabled: int = Field(default=1, alias="INTEGRITY_CHECK_ENABLED")
+    integrity_check_cron: str = Field(default="*/10 * * * *", alias="INTEGRITY_CHECK_CRON")
+
     def keyword_list(self) -> List[str]:
         """把 KEYWORDS 拆成列表，并做去重/去空。"""
         items = [x.strip() for x in (self.keywords or "").split(",")]
